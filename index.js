@@ -10,6 +10,7 @@ window.addEventListener('load', () => {
     const uploadClientsBtn = document.getElementById('uploadClients');
     const addClientManualBtn = document.getElementById('addClientManual');
     const downloadClientsBtn = document.getElementById('downloadClients');
+    const downloadTemplateBtn = document.getElementById('downloadTemplate');
     const disconnectWhatsAppBtn = document.getElementById('disconnectWhatsApp');
     const sendMessagesBtn = document.getElementById('sendMessages');
     const selectAllClientsCheckbox = document.getElementById('selectAllClients');
@@ -264,12 +265,20 @@ window.addEventListener('load', () => {
     });
     
     function displaySummaryMessage(message, type = 'success') {
-            uploadSummary.innerHTML = `<div class="status-message ${type}">${message}</div>`;
+            uploadSummary.innerHTML = `<div class="status-message ${type} alert alert-success alert-dismissible fade show" role="alert">
+                                        ${message}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                                    </div>`;
+
     }
 
-    // Descargar clientes como CSV
-    downloadClientsBtn.addEventListener('click', () => {
-        if (clients.length === 0) {
+    downloadClientsBtn.addEventListener('click', () => downloadClients());
+    downloadTemplateBtn.addEventListener('click', () => downloadClients(true));
+
+
+    function downloadClients(isTemplate) {
+
+        if (clients.length === 0 && !isTemplate) {
             showAlert('Sin Clientes', 'No hay clientes para descargar.');
             return;
         }
@@ -295,12 +304,15 @@ window.addEventListener('load', () => {
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", "clientes.csv");
+        const filenameDate = new Date().toISOString().split('T')[0];
+        const filename = isTemplate ? 'plantilla-cargue-clientes.csv' : `clientes_${filenameDate}.csv`;
+        link.setAttribute("download", filename);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    });
+
+    }
 
 
     // --- Lógica de WhatsApp y WebSocket ---
@@ -308,7 +320,6 @@ window.addEventListener('load', () => {
     const ws = new WebSocket('ws://localhost:3000');
     const whatsappStatusLoader = document.getElementById('whatsappStatus-loader');
 
-    // Agregar botón para inicializar WhatsApp
     const initWhatsAppBtn = document.createElement('button');
     initWhatsAppBtn.id = 'initWhatsApp';
     initWhatsAppBtn.className = 'btn btn-success mb-3';
@@ -324,10 +335,11 @@ window.addEventListener('load', () => {
         whatsappStatusLoader.classList.remove('spinner-border');
     };
 
+
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         console.log('Received WebSocket message:', data);
-        
+
         switch (data.type) {
             case 'waiting_initialization':
                 whatsappStatus.textContent = 'Esperando inicialización de WhatsApp...';
@@ -336,8 +348,10 @@ window.addEventListener('load', () => {
                 break;
                 
             case 'initializing':
-                whatsappStatus.textContent = 'Inicializando WhatsApp (Esto puede tardar unos minutos)...';
-                whatsappStatusLoader.classList.add('spinner-border');
+                qrContainer.innerHTML = `<p id="whatsappStatus" class="text-center">Inicializando WhatsApp (Esto puede tardar unos minutos)...</p>
+                    <div id="whatsappStatus-loader" class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>`;
                 initWhatsAppBtn.style.display = 'none';
                 whatsappInitialized = true;
                 break;
@@ -421,6 +435,13 @@ window.addEventListener('load', () => {
     disconnectWhatsAppBtn.addEventListener('click', () => {
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'disconnect' }));
+            initWhatsAppBtn.style.display = 'block';
+            whatsappInitialized = false;
+            disconnectWhatsAppBtn.classList.add('d-none');
+            qrContainer.innerHTML = `<p id="whatsappStatus" class="text-center">WhatsApp desconectado. Puedes reinicializar si es necesario.</p>
+                    <div id="whatsappStatus-loader" class="" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>`;
         }
     });
 
